@@ -41,17 +41,29 @@ try {
   console.error("User migration error:", e);
 }
 
-// Migration: Add slug column to roles if it doesn't exist
+// Migration: Add slug and permissions columns to roles if they don't exist
 try {
   const roleColumns = db.prepare("PRAGMA table_info(roles)").all() as any[];
   const hasSlug = roleColumns.some(c => c.name === 'slug');
+  const hasPermissions = roleColumns.some(c => c.name === 'permissions');
+  
   if (!hasSlug) {
     db.exec("ALTER TABLE roles ADD COLUMN slug TEXT");
-    // Update existing roles with slugs if any
     db.prepare("UPDATE roles SET slug = 'admin' WHERE name = 'Admin'").run();
     db.prepare("UPDATE roles SET slug = 'employee' WHERE name = 'Employee'").run();
-    // For others, just use lowercase name as slug
     db.exec("UPDATE roles SET slug = LOWER(REPLACE(name, ' ', '_')) WHERE slug IS NULL");
+  }
+  
+  if (!hasPermissions) {
+    db.exec("ALTER TABLE roles ADD COLUMN permissions TEXT");
+    // Set default permissions for existing roles
+    const adminPerms = JSON.stringify(['dashboard', 'application_form', 'application_history', 'assigned_applications', 'user_management', 'role_management', 'division_management', 'profile', 'reports', 'settings']);
+    const employeePerms = JSON.stringify(['dashboard', 'application_form', 'application_history', 'profile']);
+    const officerPerms = JSON.stringify(['dashboard', 'assigned_applications', 'application_history', 'profile']);
+    
+    db.prepare("UPDATE roles SET permissions = ? WHERE slug = 'admin'").run(adminPerms);
+    db.prepare("UPDATE roles SET permissions = ? WHERE slug = 'employee'").run(employeePerms);
+    db.prepare("UPDATE roles SET permissions = ? WHERE slug LIKE 'desk_officer_%'").run(officerPerms);
   }
 } catch (e) {
   console.error("Role migration error:", e);
@@ -72,6 +84,7 @@ db.exec(`
     slug TEXT UNIQUE NOT NULL,
     name_bn TEXT NOT NULL,
     description TEXT,
+    permissions TEXT,
     status TEXT DEFAULT 'Active'
   );
 
@@ -119,13 +132,17 @@ if (divisionCount.count === 0) {
 
 const roleCount = db.prepare("SELECT count(*) as count FROM roles").get() as { count: number };
 if (roleCount.count === 0) {
-  const insertRole = db.prepare("INSERT INTO roles (name, slug, name_bn, description, status) VALUES (?, ?, ?, ?, ?)");
-  insertRole.run("Admin", "admin", "অ্যাডমিন", "সিস্টেমের পূর্ণ নিয়ন্ত্রণ", "Active");
-  insertRole.run("Desk Officer (Hardware)", "desk_officer_hardware", "ডেস্ক অফিসার (হার্ডওয়্যার)", "হার্ডওয়্যার সংক্রান্ত সেবা সমাধান", "Active");
-  insertRole.run("Desk Officer (Network)", "desk_officer_network", "ডেস্ক অফিসার (নেটওয়ার্ক)", "নেটওয়ার্ক সংক্রান্ত সেবা সমাধান", "Active");
-  insertRole.run("Desk Officer (Software)", "desk_officer_software", "ডেস্ক অফিসার (সফটওয়্যার)", "সফটওয়্যার সংক্রান্ত সেবা সমাধান", "Active");
-  insertRole.run("Desk Officer (Maintenance)", "desk_officer_maintenance", "ডেস্ক অফিসার (মেইনটেন্যান্স)", "সিস্টেম মেইনটেন্যান্স সেবা সমাধান", "Active");
-  insertRole.run("Employee", "employee", "কর্মচারী", "সেবা অনুরোধ দাখিল", "Active");
+  const insertRole = db.prepare("INSERT INTO roles (name, slug, name_bn, description, permissions, status) VALUES (?, ?, ?, ?, ?, ?)");
+  const adminPerms = JSON.stringify(['dashboard', 'application_form', 'application_history', 'assigned_applications', 'user_management', 'role_management', 'division_management', 'profile', 'reports', 'settings']);
+  const employeePerms = JSON.stringify(['dashboard', 'application_form', 'application_history', 'profile']);
+  const officerPerms = JSON.stringify(['dashboard', 'assigned_applications', 'application_history', 'profile']);
+
+  insertRole.run("Admin", "admin", "অ্যাডমিন", "সিস্টেমের পূর্ণ নিয়ন্ত্রণ", adminPerms, "Active");
+  insertRole.run("Desk Officer (Hardware)", "desk_officer_hardware", "ডেস্ক অফিসার (হার্ডওয়্যার)", "হার্ডওয়্যার সংক্রান্ত সেবা সমাধান", officerPerms, "Active");
+  insertRole.run("Desk Officer (Network)", "desk_officer_network", "ডেস্ক অফিসার (নেটওয়ার্ক)", "নেটওয়ার্ক সংক্রান্ত সেবা সমাধান", officerPerms, "Active");
+  insertRole.run("Desk Officer (Software)", "desk_officer_software", "ডেস্ক অফিসার (সফটওয়্যার)", "সফটওয়্যার সংক্রান্ত সেবা সমাধান", officerPerms, "Active");
+  insertRole.run("Desk Officer (Maintenance)", "desk_officer_maintenance", "ডেস্ক অফিসার (মেইনটেন্যান্স)", "সিস্টেম মেইনটেন্যান্স সেবা সমাধান", officerPerms, "Active");
+  insertRole.run("Employee", "employee", "কর্মচারী", "সেবা অনুরোধ দাখিল", employeePerms, "Active");
 }
 
 const appCount = db.prepare("SELECT count(*) as count FROM applications").get() as { count: number };
@@ -139,17 +156,31 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
   // Auth API
   app.post("/api/login", (req, res) => {
     const { email, password } = req.body;
-    const user = db.prepare("SELECT * FROM users WHERE email = ? AND password = ?").get(email, password) as any;
+    const user = db.prepare(`
+      SELECT u.*, r.permissions 
+      FROM users u 
+      LEFT JOIN roles r ON u.role = r.slug 
+      WHERE u.email = ? AND u.password = ?
+    `).get(email, password) as any;
     
     if (user) {
       if (user.status === 'Inactive') {
         return res.status(403).json({ success: false, message: "আপনার অ্যাকাউন্টটি নিষ্ক্রিয়। আইসিটি বিভাগের সাথে যোগাযোগ করুন।" });
       }
+      
+      let permissions = [];
+      try {
+        permissions = user.permissions ? JSON.parse(user.permissions) : [];
+      } catch (e) {
+        console.error("Error parsing user permissions", e);
+      }
+
       res.json({ 
         success: true, 
         user: { 
@@ -157,7 +188,10 @@ async function startServer() {
           name_bn: user.name_bn, 
           role: user.role,
           email: user.email,
-          division: user.division
+          division: user.division,
+          photo: user.photo,
+          signature: user.signature,
+          permissions: permissions
         } 
       });
     } else {
@@ -235,18 +269,18 @@ async function startServer() {
   });
 
   app.post("/api/roles", (req, res) => {
-    const { name, slug, name_bn, description, status } = req.body;
-    const info = db.prepare("INSERT INTO roles (name, slug, name_bn, description, status) VALUES (?, ?, ?, ?, ?)")
-      .run(name, slug, name_bn, description, status);
-    res.json({ id: info.lastInsertRowid, name, slug, name_bn, description, status });
+    const { name, slug, name_bn, description, permissions, status } = req.body;
+    const info = db.prepare("INSERT INTO roles (name, slug, name_bn, description, permissions, status) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(name, slug, name_bn, description, permissions, status);
+    res.json({ id: info.lastInsertRowid, name, slug, name_bn, description, permissions, status });
   });
 
   app.put("/api/roles/:id", (req, res) => {
     const { id } = req.params;
-    const { name, slug, name_bn, description, status } = req.body;
-    db.prepare("UPDATE roles SET name = ?, slug = ?, name_bn = ?, description = ?, status = ? WHERE id = ?")
-      .run(name, slug, name_bn, description, status, id);
-    res.json({ id, name, slug, name_bn, description, status });
+    const { name, slug, name_bn, description, permissions, status } = req.body;
+    db.prepare("UPDATE roles SET name = ?, slug = ?, name_bn = ?, description = ?, permissions = ?, status = ? WHERE id = ?")
+      .run(name, slug, name_bn, description, permissions, status, id);
+    res.json({ id, name, slug, name_bn, description, permissions, status });
   });
 
   app.delete("/api/roles/:id", (req, res) => {

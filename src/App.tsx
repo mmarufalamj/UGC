@@ -3,6 +3,29 @@ import { LogIn, ShieldCheck, User, Briefcase, FileText, LayoutDashboard, Users, 
 
 type Role = string | null;
 
+interface RoleItem {
+  id: number;
+  name: string;
+  slug: string;
+  name_bn: string;
+  description: string;
+  permissions?: string;
+  status: 'Active' | 'Inactive';
+}
+
+const AVAILABLE_FEATURES = [
+  { id: 'dashboard', name: 'ড্যাশবোর্ড' },
+  { id: 'application_form', name: 'আবেদন ফরম' },
+  { id: 'application_history', name: 'আবেদনের ইতিহাস' },
+  { id: 'assigned_applications', name: 'অ্যাসাইনকৃত আবেদন' },
+  { id: 'user_management', name: 'ইউজার ম্যানেজমেন্ট' },
+  { id: 'role_management', name: 'রোল ম্যানেজমেন্ট' },
+  { id: 'division_management', name: 'বিভাগ ম্যানেজমেন্ট' },
+  { id: 'profile', name: 'প্রোফাইল' },
+  { id: 'reports', name: 'রিপোর্ট' },
+  { id: 'settings', name: 'সেটিংস' },
+];
+
 interface UserData {
   name: string;
   name_bn: string;
@@ -11,6 +34,7 @@ interface UserData {
   division?: string;
   photo?: string;
   signature?: string;
+  permissions?: string[];
 }
 
 export default function App() {
@@ -161,32 +185,39 @@ export default function App() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-1">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2">প্রধান মেনু</p>
               
-              {user.role === 'employee' && (
-                <>
-                  <SidebarLink icon={<LayoutDashboard />} label="ড্যাশবোর্ড" active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')} />
-                  <SidebarLink icon={<PlusCircle />} label="আবেদন ফর্ম" active={currentView === 'application_form'} onClick={() => setCurrentView('application_form')} />
-                  <SidebarLink icon={<FileText />} label="আমার আবেদনসমূহ" active={currentView === 'my_applications'} onClick={() => setCurrentView('my_applications')} />
-                  <SidebarLink icon={<User />} label="প্রোফাইল" active={currentView === 'profile'} onClick={() => setCurrentView('profile')} />
-                </>
+              {user.permissions?.includes('dashboard') && (
+                <SidebarLink 
+                  icon={<LayoutDashboard />} 
+                  label={user.role === 'admin' ? "অ্যাডমিন ড্যাশবোর্ড" : (user.role?.startsWith('desk_officer_') ? "অ্যাসাইনকৃত আবেদন" : "ড্যাশবোর্ড")} 
+                  active={currentView === 'dashboard'} 
+                  onClick={() => setCurrentView('dashboard')} 
+                />
               )}
-
-              {['desk_officer_hardware', 'desk_officer_network', 'desk_officer_software', 'desk_officer_maintenance'].includes(user.role || '') && (
-                <>
-                  <SidebarLink icon={<LayoutDashboard />} label="অ্যাসাইনকৃত আবেদন" active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')} />
-                  <SidebarLink icon={<FileText />} label="আবেদন হিস্টোরি" />
-                  <SidebarLink icon={<User />} label="প্রোফাইল" active={currentView === 'profile'} onClick={() => setCurrentView('profile')} />
-                </>
+              {user.permissions?.includes('application_form') && (
+                <SidebarLink icon={<PlusCircle />} label="আবেদন ফর্ম" active={currentView === 'application_form'} onClick={() => setCurrentView('application_form')} />
               )}
-
-              {user.role === 'admin' && (
-                <>
-                  <SidebarLink icon={<LayoutDashboard />} label="অ্যাডমিন ড্যাশবোর্ড" active={currentView === 'dashboard'} onClick={() => setCurrentView('dashboard')} />
-                  <SidebarLink icon={<FileText />} label="সকল আবেদন" active={currentView === 'all_applications'} onClick={() => setCurrentView('all_applications')} />
-                  <SidebarLink icon={<Users />} label="ইউজার ম্যানেজমেন্ট" active={currentView === 'user_management'} onClick={() => setCurrentView('user_management')} />
-                  <SidebarLink icon={<Briefcase />} label="বিভাগ ম্যানেজমেন্ট" active={currentView === 'division_management'} onClick={() => setCurrentView('division_management')} />
-                  <SidebarLink icon={<ShieldCheck />} label="রোল ম্যানেজমেন্ট" active={currentView === 'role_management'} onClick={() => setCurrentView('role_management')} />
-                  <SidebarLink icon={<Settings />} label="সিস্টেম সেটিংস" active={currentView === 'system_settings'} onClick={() => setCurrentView('system_settings')} />
-                </>
+              {user.permissions?.includes('application_history') && (
+                <SidebarLink 
+                  icon={<FileText />} 
+                  label={user.role === 'admin' ? "সকল আবেদন" : (user.role?.startsWith('desk_officer_') ? "আবেদন হিস্টোরি" : "আমার আবেদনসমূহ")} 
+                  active={user.role === 'admin' ? currentView === 'all_applications' : currentView === 'my_applications'} 
+                  onClick={() => setCurrentView(user.role === 'admin' ? 'all_applications' : 'my_applications')} 
+                />
+              )}
+              {user.permissions?.includes('user_management') && (
+                <SidebarLink icon={<Users />} label="ইউজার ম্যানেজমেন্ট" active={currentView === 'user_management'} onClick={() => setCurrentView('user_management')} />
+              )}
+              {user.permissions?.includes('division_management') && (
+                <SidebarLink icon={<Briefcase />} label="বিভাগ ম্যানেজমেন্ট" active={currentView === 'division_management'} onClick={() => setCurrentView('division_management')} />
+              )}
+              {user.permissions?.includes('role_management') && (
+                <SidebarLink icon={<ShieldCheck />} label="রোল ম্যানেজমেন্ট" active={currentView === 'role_management'} onClick={() => setCurrentView('role_management')} />
+              )}
+              {user.permissions?.includes('settings') && (
+                <SidebarLink icon={<Settings />} label="সিস্টেম সেটিংস" active={currentView === 'system_settings'} onClick={() => setCurrentView('system_settings')} />
+              )}
+              {user.permissions?.includes('profile') && (
+                <SidebarLink icon={<User />} label="প্রোফাইল" active={currentView === 'profile'} onClick={() => setCurrentView('profile')} />
               )}
             </div>
           </aside>
@@ -610,6 +641,7 @@ interface Application {
 function ApplicationList({ user }: { user: UserData }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
 
   useEffect(() => {
     const fetchApps = async () => {
@@ -658,7 +690,14 @@ function ApplicationList({ user }: { user: UserData }) {
         </thead>
         <tbody className="divide-y divide-gray-50">
           {applications.map((app) => (
-            <ApplicationRow key={app.id} id={app.tracking_no} date={app.submission_date} type={app.service_type} status={app.status} />
+            <ApplicationRow 
+              key={app.id} 
+              id={app.tracking_no} 
+              date={app.submission_date} 
+              type={app.service_type} 
+              status={app.status} 
+              onView={(id) => setSelectedApp(applications.find(a => a.tracking_no === id) || null)}
+            />
           ))}
           {applications.length === 0 && (
             <tr>
@@ -667,6 +706,67 @@ function ApplicationList({ user }: { user: UserData }) {
           )}
         </tbody>
       </table>
+
+      {/* View Modal */}
+      {selectedApp && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="bg-[#1a3a6b] px-6 py-4 flex justify-between items-center">
+              <h3 className="text-white font-bold text-sm">আবেদনের বিস্তারিত</h3>
+              <button onClick={() => setSelectedApp(null)} className="text-white hover:text-gray-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div>
+                  <p className="text-gray-400 font-bold uppercase tracking-wider mb-1">ট্র্যাকিং নম্বর</p>
+                  <p className="font-bold text-blue-600">{selectedApp.tracking_no}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 font-bold uppercase tracking-wider mb-1">তারিখ</p>
+                  <p className="font-bold">{selectedApp.submission_date}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 font-bold uppercase tracking-wider mb-1">আবেদনকারী</p>
+                  <p className="font-bold">{selectedApp.user_name}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 font-bold uppercase tracking-wider mb-1">বিভাগ</p>
+                  <p className="font-bold">{selectedApp.division}</p>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-2">অনুরোধকৃত সেবাসমূহ</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedApp.service_type.split(', ').map((t, i) => (
+                    <span key={i} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-xs border border-blue-100 font-medium">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">সমস্যার বিবরণ</p>
+                <div className="bg-gray-50 p-3 rounded-lg text-xs text-gray-700 leading-relaxed border border-gray-100">
+                  {selectedApp.problem_details || 'কোন বিবরণ নেই'}
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end">
+                <button 
+                  onClick={() => setSelectedApp(null)}
+                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-200 transition"
+                >
+                  বন্ধ করুন
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -676,9 +776,10 @@ interface ApplicationRowProps {
   date: string;
   type: string;
   status: string;
+  onView: (id: string) => void;
 }
 
-const ApplicationRow: React.FC<ApplicationRowProps> = ({ id, date, type, status }) => {
+const ApplicationRow: React.FC<ApplicationRowProps> = ({ id, date, type, status, onView }) => {
   const statusColors: Record<string, string> = {
     'Submitted': 'bg-gray-400',
     'Forwarded for Approval': 'bg-indigo-500',
@@ -697,14 +798,27 @@ const ApplicationRow: React.FC<ApplicationRowProps> = ({ id, date, type, status 
     <tr className="hover:bg-gray-50/50 transition-colors">
       <td className="px-4 py-4 text-xs font-bold text-blue-600">{id}</td>
       <td className="px-4 py-4 text-xs text-gray-500">{date}</td>
-      <td className="px-4 py-4 text-xs text-gray-600 truncate max-w-[200px]">{type}</td>
+      <td className="px-4 py-4 text-xs text-gray-600 min-w-[200px] max-w-[400px]">
+        <div className="flex flex-wrap gap-1">
+          {type.split(', ').map((t, i) => (
+            <span key={i} className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] border border-blue-100">
+              {t}
+            </span>
+          ))}
+        </div>
+      </td>
       <td className="px-4 py-4">
         <span className={`px-2 py-0.5 text-[9px] font-bold text-white rounded-full ${statusColors[status] || 'bg-gray-400'}`}>
           {statusLabels[status] || status}
         </span>
       </td>
       <td className="px-4 py-4 text-right">
-        <button className="text-[#1a3a6b] hover:text-blue-900 text-xs font-bold">দেখুন</button>
+        <button 
+          onClick={() => onView(id)}
+          className="text-[#1a3a6b] hover:text-blue-900 text-xs font-bold flex items-center gap-1 ml-auto"
+        >
+          <FileText className="w-3 h-3" /> দেখুন
+        </button>
       </td>
     </tr>
   );
@@ -1543,15 +1657,6 @@ function DivisionManagement() {
   );
 }
 
-interface RoleItem {
-  id: number;
-  name: string;
-  slug: string;
-  name_bn: string;
-  description: string;
-  status: 'Active' | 'Inactive';
-}
-
 function RoleManagement() {
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1579,17 +1684,25 @@ function RoleManagement() {
     slug: '',
     name_bn: '',
     description: '',
+    permissions: [] as string[],
     status: 'Active' as 'Active' | 'Inactive'
   });
 
   const handleOpenModal = (role?: RoleItem) => {
     if (role) {
       setEditingRole(role);
+      let perms: string[] = [];
+      try {
+        perms = role.permissions ? JSON.parse(role.permissions) : [];
+      } catch (e) {
+        console.error("Error parsing permissions", e);
+      }
       setFormData({
         name: role.name,
         slug: role.slug,
         name_bn: role.name_bn,
         description: role.description || '',
+        permissions: perms,
         status: role.status
       });
     } else {
@@ -1599,6 +1712,7 @@ function RoleManagement() {
         slug: '',
         name_bn: '',
         description: '',
+        permissions: [],
         status: 'Active'
       });
     }
@@ -1617,6 +1731,7 @@ function RoleManagement() {
       slug: formData.slug,
       name_bn: formData.name_bn,
       description: formData.description,
+      permissions: JSON.stringify(formData.permissions),
       status: formData.status
     };
 
@@ -1714,8 +1829,8 @@ function RoleManagement() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="bg-[#1a3a6b] px-6 py-4 flex justify-between items-center">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-[#1a3a6b] px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="text-white font-bold text-sm">
                 {editingRole ? 'রোল এডিট করুন' : 'নতুন রোল যোগ করুন'}
               </h3>
@@ -1723,60 +1838,86 @@ function RoleManagement() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">রোলের নাম (English)</label>
-                <input 
-                  type="text" 
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="উদা: Admin"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">সিস্টেম স্ল্যাগ (System Slug)</label>
-                <input 
-                  type="text" 
-                  required
-                  value={formData.slug}
-                  onChange={(e) => setFormData({...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '_')})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="উদা: admin, desk_officer_hardware"
-                />
-                <p className="text-[9px] text-gray-400 mt-1">* এটি সিস্টেমের অভ্যন্তরীণ কাজের জন্য ব্যবহৃত হয়। পরিবর্তন করার সময় সতর্ক থাকুন।</p>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">রোলের নাম (বাংলা)</label>
-                <input 
-                  type="text" 
-                  required
-                  value={formData.name_bn}
-                  onChange={(e) => setFormData({...formData, name_bn: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="উদা: অ্যাডমিন"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">বিবরণ</label>
-                <textarea 
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px]"
-                  placeholder="রোলের সংক্ষিপ্ত বিবরণ..."
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">অবস্থা</label>
-                <select 
-                  value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value as 'Active' | 'Inactive'})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value="Active">সক্রিয় (Active)</option>
-                  <option value="Inactive">নিষ্ক্রিয় (Inactive)</option>
-                </select>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">রোলের নাম (English)</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="উদা: Admin"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">সিস্টেম স্ল্যাগ (System Slug)</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.slug}
+                      onChange={(e) => setFormData({...formData, slug: e.target.value.toLowerCase().replace(/\s+/g, '_')})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="উদা: admin, desk_officer_hardware"
+                    />
+                    <p className="text-[9px] text-gray-400 mt-1">* এটি সিস্টেমের অভ্যন্তরীণ কাজের জন্য ব্যবহৃত হয়। পরিবর্তন করার সময় সতর্ক থাকুন।</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">রোলের নাম (বাংলা)</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name_bn}
+                      onChange={(e) => setFormData({...formData, name_bn: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="উদা: অ্যাডমিন"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">বিবরণ</label>
+                    <textarea 
+                      value={formData.description}
+                      onChange={(e) => setFormData({...formData, description: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px]"
+                      placeholder="রোলের সংক্ষিপ্ত বিবরণ..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">অবস্থা</label>
+                    <select 
+                      value={formData.status}
+                      onChange={(e) => setFormData({...formData, status: e.target.value as 'Active' | 'Inactive'})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value="Active">সক্রিয় (Active)</option>
+                      <option value="Inactive">নিষ্ক্রিয় (Inactive)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-gray-700 mb-2">ফিচার অ্যাসাইন করুন (Assign Features)</label>
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-2 max-h-[300px] overflow-y-auto">
+                    {AVAILABLE_FEATURES.map(feature => (
+                      <label key={feature.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-md cursor-pointer transition-colors border border-transparent hover:border-gray-200">
+                        <input 
+                          type="checkbox"
+                          checked={formData.permissions.includes(feature.id)}
+                          onChange={(e) => {
+                            const newPerms = e.target.checked 
+                              ? [...formData.permissions, feature.id]
+                              : formData.permissions.filter(p => p !== feature.id);
+                            setFormData({...formData, permissions: newPerms});
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-700 font-medium">{feature.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="pt-4 flex gap-3">
                 <button 
