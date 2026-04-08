@@ -1,0 +1,73 @@
+/* Print Specific Styles for UGC IT Service Form */
+
+@media print {
+    @page {
+        size: A4;
+        margin: 10mm;
+    }
+
+    body {
+        font-family: 'Noto Sans Bengali', sans-serif;
+        font-size: 11pt;
+        line-height: 1.4;
+        color: black;
+        background: white;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    .ticket-container {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Keep borders visible in print */
+    .border-2 { border-width: 2px !important; }
+    .border { border-width: 1px !important; }
+    .border-black { border-color: black !important; }
+    .border-dotted { border-style: dotted !important; }
+
+    /* Grid Layouts */
+    .grid-cols-3 {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+
+    .grid-cols-4 {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+    }
+
+    /* Checkbox Styles for Print */
+    input[type="checkbox"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        border: 1px solid black;
+        display: inline-block;
+        position: relative;
+    }
+
+    input[type="checkbox"]:checked::after {
+        content: '✓';
+        position: absolute;
+        top: -4px;
+        left: 1px;
+        font-size: 10px;
+        font-weight: bold;
+    }
+
+    /* Force background colors if needed (not usually recommended for print) */
+    .bg-gray-50 { background-color: #f9fafb !important; }
+    
+    /* Ensure text is black */
+    .text-blue-600 { color: black !important; }
+    .text-gray-500 { color: #666 !important; }
+}

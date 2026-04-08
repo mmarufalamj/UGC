@@ -1,0 +1,64 @@
+@import url('https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css');
+
+/* Custom Styles for UGC IT Service System */
+
+:root {
+    --ugc-blue: #1a3a6b;
+}
+
+body {
+    font-family: 'Noto Sans Bengali', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.font-bn {
+    font-family: 'Noto Sans Bengali', sans-serif;
+}
+
+/* Print Specific Styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    body {
+        background-color: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .ticket-container {
+        box-shadow: none !important;
+        border: none !important;
+        width: 100% !important;
+        max-width: none !important;
+        padding: 0 !important;
+    }
+}
+
+/* Form Elements */
+input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* Status Badges */
+.status-submitted { @apply bg-gray-500; }
+.status-received { @apply bg-blue-500; }
+.status-in-progress { @apply bg-yellow-500; }
+.status-resolved { @apply bg-green-500; }
+.status-closed { @apply bg-black; }
+
+/* Custom Grid for Service Section */
+.service-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 2px solid black;
+}
+
+.service-col {
+    border-right: 2px solid black;
+    padding: 10px;
+}
+
+.service-col:last-child {
+    border-right: none;
+}
