@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogIn, ShieldCheck, User, Briefcase, FileText, LayoutDashboard, Users, Settings, LogOut, Printer, PlusCircle, Trash2, Edit, X, Camera, PenTool } from 'lucide-react';
+import { LogIn, ShieldCheck, User, Briefcase, FileText, LayoutDashboard, Users, Settings, LogOut, Printer, PlusCircle, Trash2, Edit, X, Camera, PenTool, Download, Upload, AlertTriangle, Send } from 'lucide-react';
 
 type Role = string | null;
 
@@ -12,6 +12,16 @@ interface RoleItem {
   permissions?: string;
   status: 'Active' | 'Inactive';
 }
+
+const STATUS_CONFIG: Record<string, { label: string, color: string }> = {
+  'Submitted': { label: 'দাখিলকৃত', color: 'bg-gray-400' },
+  'Forwarded for Approval': { label: 'অনুমোদনের জন্য প্রেরিত', color: 'bg-indigo-500' },
+  'In Progress': { label: 'চলমান', color: 'bg-yellow-500' },
+  'Done': { label: 'সম্পন্ন', color: 'bg-green-500' },
+  'প্রক্রিয়াধীন রয়েছে': { label: 'প্রক্রিয়াধীন রয়েছে', color: 'bg-yellow-500' },
+  'নথিতে উপস্থাপন করা হয়েছে': { label: 'নথিতে উপস্থাপন করা হয়েছে', color: 'bg-blue-500' },
+  'সম্পন্ন': { label: 'সম্পন্ন', color: 'bg-green-500' }
+};
 
 const AVAILABLE_FEATURES = [
   { id: 'dashboard', name: 'ড্যাশবোর্ড' },
@@ -211,7 +221,7 @@ export default function App() {
               {user.permissions?.includes('application_history') && (
                 <SidebarLink 
                   icon={<FileText />} 
-                  label={user.role === 'admin' ? "সকল আবেদন" : (user.role?.startsWith('desk_officer_') ? "আবেদন হিস্টোরি" : "আমার আবেদনসমূহ")} 
+                  label={user.role === 'admin' ? "সকল আবেদন" : (user.role?.startsWith('desk_officer_') ? "আবেদন হিস্টোরি" : "দাখিলকৃত আবেদনসমূহ")} 
                   active={user.role === 'admin' ? currentView === 'all_applications' : currentView === 'my_applications'} 
                   onClick={() => setCurrentView(user.role === 'admin' ? 'all_applications' : 'my_applications')} 
                 />
@@ -219,7 +229,10 @@ export default function App() {
               {user.permissions?.includes('received_applications') && (
                 <SidebarLink icon={<FileText />} label="আগত আবেদনসমূহ" active={currentView === 'received_applications'} onClick={() => setCurrentView('received_applications')} />
               )}
-              {user.permissions?.includes('assigned_applications') && (
+              {user.role === 'divisional_head' && (
+                <SidebarLink icon={<Send />} label="প্রেরিত আবেদনসমূহ" active={currentView === 'forwarded_applications'} onClick={() => setCurrentView('forwarded_applications')} />
+              )}
+              {user.permissions?.includes('assigned_applications') && !user.role?.startsWith('desk_officer_') && (
                 <SidebarLink icon={<ShieldCheck />} label="অ্যাসাইনকৃত আবেদন" active={currentView === 'assigned_applications'} onClick={() => setCurrentView('assigned_applications')} />
               )}
               {user.permissions?.includes('user_management') && (
@@ -246,9 +259,10 @@ export default function App() {
               <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                 <h2 className="text-lg font-bold text-gray-800">
                   {currentView === 'application_form' ? 'আইটি সেবা ফরম' : 
-                   currentView === 'my_applications' ? 'আমার আবেদনসমূহ' :
+                   currentView === 'my_applications' ? 'দাখিলকৃত আবেদনসমূহ' :
                    currentView === 'all_applications' ? 'সকল আবেদন' :
                    currentView === 'received_applications' ? 'আগত আবেদনসমূহ' :
+                   currentView === 'forwarded_applications' ? 'প্রেরিত আবেদনসমূহ' :
                    currentView === 'assigned_applications' ? 'অ্যাসাইনকৃত আবেদন' :
                    currentView === 'profile' ? 'প্রোফাইল' :
                    (user.role === 'admin' ? 'সিস্টেম ওভারভিউ' : 'আমার ড্যাশবোর্ড')}
@@ -266,13 +280,16 @@ export default function App() {
                  currentView === 'user_management' ? <UserManagement /> :
                  currentView === 'division_management' ? <DivisionManagement /> :
                  currentView === 'role_management' ? <RoleManagement /> :
-                 currentView === 'my_applications' ? <ApplicationList user={user} /> :
-                 currentView === 'all_applications' ? <AllApplications /> :
+                 currentView === 'my_applications' ? <ApplicationList user={user} view="my_applications" /> :
+                 currentView === 'all_applications' ? <AllApplications user={user} /> :
                  currentView === 'received_applications' ? <ReceivedApplications user={user} /> :
-                 currentView === 'assigned_applications' ? <ApplicationList user={user} /> :
+                 currentView === 'forwarded_applications' ? <ForwardedApplications user={user} /> :
+                 currentView === 'assigned_applications' ? <ApplicationList user={user} view="assigned_applications" /> :
                  currentView === 'system_settings' ? <SystemSettings /> :
                  currentView === 'profile' ? <Profile user={user} onUpdate={setUser} /> :
-                 (user.role === 'admin' ? <AdminDashboard /> : <ApplicationList user={user} />)}
+                 (user.role === 'admin' ? <AdminDashboard /> : 
+                  user.role?.startsWith('desk_officer_') ? <ApplicationList user={user} view="assigned_applications" /> : 
+                  <ApplicationList user={user} view="my_applications" />)}
               </div>
             </div>
           </main>
@@ -285,6 +302,34 @@ export default function App() {
           <p className="text-[10px] text-gray-300 mt-1 uppercase tracking-widest">Developed by ICT Division, UGC</p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function AlertModal({ isOpen, message, onClose }: { isOpen: boolean, message: string, onClose: () => void }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center">
+        <div className="text-red-500 mb-4 flex justify-center"><AlertTriangle className="w-10 h-10" /></div>
+        <p className="text-sm font-bold text-gray-800 mb-6">{message}</p>
+        <button onClick={onClose} className="px-6 py-2 bg-[#1a3a6b] text-white rounded-lg text-xs font-bold hover:bg-blue-800">ঠিক আছে</button>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmModal({ isOpen, message, onConfirm, onCancel }: { isOpen: boolean, message: string, onConfirm: () => void, onCancel: () => void }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center">
+        <p className="text-sm font-bold text-gray-800 mb-6">{message}</p>
+        <div className="flex justify-center gap-4">
+          <button onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg text-xs font-bold hover:bg-gray-300">বাতিল</button>
+          <button onClick={onConfirm} className="px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700">নিশ্চিত</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -311,6 +356,18 @@ function ApplicationForm({ user }: { user: UserData }) {
     problem_details: ''
   });
 
+  if (!user.signature) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-3">
+        <AlertTriangle className="w-5 h-5" />
+        <div>
+          <p className="font-bold">সতর্কতা!</p>
+          <p className="text-sm">আবেদন দাখিল করার আগে প্রোফাইলে আপনার স্বাক্ষর আপলোড করুন। স্বাক্ষর ছাড়া আবেদন করা যাবে না।</p>
+        </div>
+      </div>
+    );
+  }
+
   const handleServiceChange = (service: string) => {
     setFormData(prev => ({
       ...prev,
@@ -322,6 +379,10 @@ function ApplicationForm({ user }: { user: UserData }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user.signature) {
+      alert('আবেদন দাখিল করার আগে প্রোফাইলে আপনার স্বাক্ষর আপলোড করুন।');
+      return;
+    }
     try {
       const response = await fetch('/api/applications', {
         method: 'POST',
@@ -330,6 +391,8 @@ function ApplicationForm({ user }: { user: UserData }) {
           user_email: user.email,
           user_name: user.name_bn,
           division: formData.division,
+          designation: formData.designation,
+          mobile: formData.mobile,
           service_type: formData.service_type.join(', '),
           problem_details: formData.problem_details,
           applicant_signature: user.signature,
@@ -632,26 +695,15 @@ function Bar({ height, label, color }: { height: string, label: string, color: s
 }
 
 function ActivityItem({ trackingNo, user, status }: { trackingNo: string, user: string, status: string }) {
-  const statusLabels: Record<string, string> = {
-    'Submitted': 'দাখিলকৃত',
-    'Forwarded for Approval': 'অনুমোদনের জন্য প্রেরিত',
-    'In Progress': 'চলমান',
-    'Done': 'সম্পন্ন'
-  };
-  const statusColors: Record<string, string> = {
-    'Submitted': 'bg-gray-400',
-    'Forwarded for Approval': 'bg-indigo-500',
-    'In Progress': 'bg-yellow-500',
-    'Done': 'bg-green-500'
-  };
+  const config = STATUS_CONFIG[status] || { label: status, color: 'bg-gray-400' };
   return (
     <div className="flex items-center justify-between p-2 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-gray-100">
       <div>
         <p className="text-xs font-bold text-blue-700">{trackingNo}</p>
         <p className="text-[10px] text-gray-500">{user}</p>
       </div>
-      <span className={`px-2 py-0.5 text-[9px] font-bold text-white rounded-full ${statusColors[status] || 'bg-gray-400'}`}>
-        {statusLabels[status] || status}
+      <span className={`px-2 py-0.5 text-[9px] font-bold text-white rounded-full ${config.color}`}>
+        {config.label}
       </span>
     </div>
   );
@@ -663,6 +715,8 @@ interface Application {
   user_email: string;
   user_name: string;
   division: string;
+  designation?: string;
+  mobile?: string;
   service_type: string;
   problem_details: string;
   status: string;
@@ -672,18 +726,22 @@ interface Application {
   div_head_signature?: string;
   div_head_signed_at?: string;
   div_head_email?: string;
+  officer_signature?: string;
+  officer_signed_at?: string;
+  officer_name?: string;
 }
 
 function ReceivedApplications({ user }: { user: UserData }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const [alertMessage, setAlertMessage] = useState('');
 
   const fetchApps = async () => {
     try {
       const response = await fetch('/api/applications');
       const data = await response.json();
-      const filtered = data.filter((app: Application) => app.division === user.division && app.status === 'Submitted');
+      const filtered = data.filter((app: Application) => app.division === user.division && app.status === 'Submitted' && app.user_email !== user.email);
       setApplications(filtered);
     } catch (error) {
       console.error('Error fetching applications:', error);
@@ -696,13 +754,18 @@ function ReceivedApplications({ user }: { user: UserData }) {
     fetchApps();
   }, [user.division]);
 
-  const handleApprove = async (appId: number) => {
+  const handleApprove = async (appId: number, status: string = 'Forwarded for Approval') => {
+    if (!user.signature) {
+      setAlertMessage('আবেদন অনুমোদন/বাতিল করার আগে প্রোফাইলে আপনার স্বাক্ষর আপলোড করুন।');
+      return;
+    }
     try {
       await fetch('/api/applications/approve', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: appId,
+          status,
           div_head_email: user.email,
           div_head_signature: user.signature,
           div_head_signed_at: new Date().toLocaleString('bn-BD')
@@ -741,10 +804,16 @@ function ReceivedApplications({ user }: { user: UserData }) {
                   দেখুন
                 </button>
                 <button 
-                  onClick={() => handleApprove(app.id)}
+                  onClick={() => handleApprove(app.id, 'Forwarded for Approval')}
                   className="bg-green-600 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-green-700"
                 >
                   অনুমোদন করুন
+                </button>
+                <button 
+                  onClick={() => handleApprove(app.id, 'Rejected by Divisional Head')}
+                  className="bg-red-600 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-red-700"
+                >
+                  বাতিল করুন
                 </button>
               </td>
             </tr>
@@ -752,6 +821,79 @@ function ReceivedApplications({ user }: { user: UserData }) {
           {applications.length === 0 && (
             <tr>
               <td colSpan={4} className="px-4 py-10 text-center text-gray-400 text-xs italic">কোন নতুন আবেদন নেই</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {selectedApp && (
+        <ApplicationViewModal app={selectedApp} onClose={() => setSelectedApp(null)} />
+      )}
+      <AlertModal isOpen={!!alertMessage} message={alertMessage} onClose={() => setAlertMessage('')} />
+    </div>
+  );
+}
+
+function ForwardedApplications({ user }: { user: UserData }) {
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+
+  const fetchApps = async () => {
+    try {
+      const response = await fetch('/api/applications');
+      const data = await response.json();
+      const filtered = data.filter((app: Application) => app.div_head_email === user.email && (app.status === 'Forwarded for Approval' || app.status === 'Rejected by Divisional Head' || app.status === 'In Progress' || app.status === 'Done'));
+      setApplications(filtered);
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApps();
+  }, [user.email]);
+
+  if (loading) return <div className="text-center py-10 text-gray-500 text-xs">লোড হচ্ছে...</div>;
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-100">
+        <thead>
+          <tr className="bg-gray-50/50">
+            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">ট্র্যাকিং নম্বর</th>
+            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">আবেদনকারী</th>
+            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">সেবার ধরণ</th>
+            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">অবস্থা</th>
+            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">অ্যাকশন</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {applications.map((app) => (
+            <tr key={app.id} className="hover:bg-gray-50/50 transition-colors">
+              <td className="px-4 py-4 text-xs font-bold text-blue-600">{app.tracking_no}</td>
+              <td className="px-4 py-4 text-xs text-gray-600">{app.user_name}</td>
+              <td className="px-4 py-4 text-xs text-gray-500">{app.service_type}</td>
+              <td className="px-4 py-4">
+                <span className={`px-2 py-0.5 text-[9px] font-bold text-white rounded-full ${STATUS_CONFIG[app.status]?.color || 'bg-gray-400'}`}>
+                  {STATUS_CONFIG[app.status]?.label || app.status}
+                </span>
+              </td>
+              <td className="px-4 py-4 text-right space-x-2">
+                <button 
+                  onClick={() => setSelectedApp(app)}
+                  className="text-[#1a3a6b] hover:text-blue-900 text-xs font-bold"
+                >
+                  দেখুন
+                </button>
+              </td>
+            </tr>
+          ))}
+          {applications.length === 0 && (
+            <tr>
+              <td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-xs italic">কোন প্রেরিত আবেদন নেই</td>
             </tr>
           )}
         </tbody>
@@ -800,13 +942,47 @@ function ApplicationViewModal({ app, onClose }: { app: Application, onClose: () 
             <div className="border border-black p-6 space-y-6">
               <div className="grid grid-cols-2 gap-y-4 text-sm">
                 <div className="flex gap-2"><b>আবেদনকারীর নাম:</b> <span className="border-b border-black flex-1">{app.user_name}</span></div>
-                <div className="flex gap-2"><b>পদবী:</b> <span className="border-b border-black flex-1"></span></div>
+                <div className="flex gap-2"><b>পদবী:</b> <span className="border-b border-black flex-1">{app.designation}</span></div>
                 <div className="flex gap-2"><b>বিভাগ/দপ্তর:</b> <span className="border-b border-black flex-1">{app.division}</span></div>
-                <div className="flex gap-2"><b>মোবাইল:</b> <span className="border-b border-black flex-1"></span></div>
+                <div className="flex gap-2"><b>মোবাইল:</b> <span className="border-b border-black flex-1">{app.mobile}</span></div>
               </div>
 
               <div>
-                <p className="text-sm font-bold mb-2">সেবার ধরণ: {app.service_type}</p>
+                <p className="text-sm font-bold mb-2">সেবার ধরণ:</p>
+                <div className="border border-black rounded overflow-hidden">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-100 border-b border-black">
+                      <tr>
+                        <th className="px-4 py-2 font-bold border-r border-black w-1/4">ক্যাটাগরি</th>
+                        <th className="px-4 py-2 font-bold border-r border-black w-1/4 text-center">নতুন সরবরাহ</th>
+                        <th className="px-4 py-2 font-bold border-r border-black w-1/4 text-center">মেরামত/সেবা প্রদান</th>
+                        <th className="px-4 py-2 font-bold w-1/4">সেবাসমূহ (আইটেম)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black">
+                      {['হার্ডওয়্যার', 'নেটওয়ার্ক', 'সফটওয়্যার', 'সিস্টেম মেইনটেন্যান্স'].map(category => {
+                        const isNew = app.service_type.includes(`${category} - নতুন সরবরাহ`);
+                        const isRepair = app.service_type.includes(`${category} - মেরামত/সেবা প্রদান`);
+                        const items = app.service_type.split(', ')
+                          .filter(s => s.startsWith(`${category} - `) && !s.includes('নতুন সরবরাহ') && !s.includes('মেরামত/সেবা প্রদান'))
+                          .map(s => s.replace(`${category} - `, ''));
+                        
+                        if (!isNew && !isRepair && items.length === 0) return null;
+
+                        return (
+                          <tr key={category}>
+                            <td className="px-4 py-2 border-r border-black font-semibold">{category}</td>
+                            <td className="px-4 py-2 border-r border-black text-center font-bold text-lg">{isNew ? '✓' : ''}</td>
+                            <td className="px-4 py-2 border-r border-black text-center font-bold text-lg">{isRepair ? '✓' : ''}</td>
+                            <td className="px-4 py-2">
+                              {items.join(', ')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div>
@@ -838,12 +1014,21 @@ function ApplicationViewModal({ app, onClose }: { app: Application, onClose: () 
               <p className="text-sm font-bold mb-2">আইসিটি বিভাগ কর্তৃক পূরণীয়:</p>
               <div className="border border-black p-6">
                 <div className="grid grid-cols-4 gap-4 mb-8">
-                  {['দায়িত্বপ্রাপ্ত কর্মকর্তার স্বাক্ষর', 'উপ-পরিচালক', 'অতিরিক্ত পরিচালক', 'পরিচালক'].map(role => (
+                  <div className="border-t border-black text-center text-[10px] font-bold pt-1 relative">
+                    {app.officer_signature && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 flex flex-col items-center">
+                        <img src={app.officer_signature} alt="Officer Signature" className="h-8 object-contain" />
+                        <span className="text-[8px] font-normal whitespace-nowrap">{app.officer_signed_at}</span>
+                      </div>
+                    )}
+                    দায়িত্বপ্রাপ্ত কর্মকর্তার স্বাক্ষর
+                  </div>
+                  {['উপ-পরিচালক', 'অতিরিক্ত পরিচালক', 'পরিচালক'].map(role => (
                     <div key={role} className="border-t border-black text-center text-[10px] font-bold pt-1">{role}</div>
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-xs mb-4">
-                  <div className="flex gap-2"><b>সেবা প্রদানকারীর নাম:</b> <span className="border-b border-black flex-1"></span></div>
+                  <div className="flex gap-2"><b>সেবা প্রদানকারীর নাম:</b> <span className="border-b border-black flex-1">{app.officer_name}</span></div>
                   <div className="flex gap-2"><b>পদবী:</b> <span className="border-b border-black flex-1"></span></div>
                 </div>
                 <div className="text-xs">
@@ -863,29 +1048,44 @@ function ApplicationViewModal({ app, onClose }: { app: Application, onClose: () 
   );
 }
 
-function ApplicationList({ user }: { user: UserData }) {
+function ApplicationList({ user, view }: { user: UserData, view: 'my_applications' | 'assigned_applications' }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const [alertMessage, setAlertMessage] = useState('');
 
   const fetchApps = async () => {
     try {
       let url = '/api/applications';
-      if (user.role === 'employee') {
+      if (view === 'my_applications') {
         url += `?email=${user.email}`;
       }
       const response = await fetch(url);
       let data = await response.json();
       
-      // Filter for Desk Officers
-      if (user.role === 'desk_officer_hardware') {
-        data = data.filter((app: any) => app.service_type.includes('হার্ডওয়্যার') && app.status !== 'Submitted');
-      } else if (user.role === 'desk_officer_network') {
-        data = data.filter((app: any) => app.service_type.includes('নেটওয়ার্ক') && app.status !== 'Submitted');
-      } else if (user.role === 'desk_officer_software') {
-        data = data.filter((app: any) => app.service_type.includes('সফটওয়্যার') && app.status !== 'Submitted');
-      } else if (user.role === 'desk_officer_maintenance') {
-        data = data.filter((app: any) => app.service_type.includes('সিস্টেম মেইনটেন্যান্স') && app.status !== 'Submitted');
+      // Filter for Desk Officers in assigned_applications view
+      if (view === 'assigned_applications') {
+        let keyword = '';
+        if (user.role === 'desk_officer_hardware') keyword = 'হার্ডওয়্যার';
+        else if (user.role === 'desk_officer_network') keyword = 'নেটওয়ার্ক';
+        else if (user.role === 'desk_officer_software') keyword = 'সফটওয়্যার';
+        else if (user.role === 'desk_officer_maintenance') keyword = 'সিস্টেম মেইনটেন্যান্স';
+
+        if (keyword) {
+          const allowedStatuses = [
+            'Forwarded for Approval', 
+            'In Progress', 
+            'Done', 
+            'প্রক্রিয়াধীন রয়েছে', 
+            'নথিতে উপস্থাপন করা হয়েছে', 
+            'সম্পন্ন'
+          ];
+          data = data.filter((app: any) => app.service_type.includes(keyword) && allowedStatuses.includes(app.status))
+                     .map((app: any) => ({
+                       ...app,
+                       service_type: app.service_type.split(', ').filter((s: string) => s.includes(keyword)).join(', ')
+                     }));
+        }
       }
       
       setApplications(data);
@@ -901,11 +1101,20 @@ function ApplicationList({ user }: { user: UserData }) {
   }, [user.email, user.role]);
 
   const handleStatusUpdate = async (id: number, status: string) => {
+    if (!user.signature) {
+      setAlertMessage('স্ট্যাটাস পরিবর্তন করার আগে প্রোফাইলে আপনার স্বাক্ষর আপলোড করুন।');
+      return;
+    }
     try {
       await fetch(`/api/applications/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ 
+          status,
+          officer_signature: user.signature,
+          officer_signed_at: new Date().toLocaleString('bn-BD'),
+          officer_name: user.name_bn
+        })
       });
       fetchApps();
     } catch (error) {
@@ -950,6 +1159,7 @@ function ApplicationList({ user }: { user: UserData }) {
       {selectedApp && (
         <ApplicationViewModal app={selectedApp} onClose={() => setSelectedApp(null)} />
       )}
+      <AlertModal isOpen={!!alertMessage} message={alertMessage} onClose={() => setAlertMessage('')} />
     </div>
   );
 }
@@ -964,22 +1174,7 @@ interface ApplicationRowProps {
 }
 
 const ApplicationRow: React.FC<ApplicationRowProps> = ({ id, date, type, status, onView, onStatusUpdate }) => {
-  const statusColors: Record<string, string> = {
-    'Submitted': 'bg-gray-400',
-    'Forwarded for Approval': 'bg-indigo-500',
-    'In Progress': 'bg-yellow-500',
-    'Done': 'bg-green-500',
-    'প্রক্রিয়াধীন রয়েছে': 'bg-yellow-500',
-    'নথিতে উপস্থাপন করা হয়েছে': 'bg-blue-500',
-    'সম্পন্ন': 'bg-green-500'
-  };
-
-  const statusLabels: Record<string, string> = {
-    'Submitted': 'দাখিলকৃত',
-    'Forwarded for Approval': 'অনুমোদনের জন্য প্রেরিত',
-    'In Progress': 'চলমান',
-    'Done': 'সম্পন্ন'
-  };
+  const config = STATUS_CONFIG[status] || { label: status, color: 'bg-gray-400' };
 
   return (
     <tr className="hover:bg-gray-50/50 transition-colors">
@@ -1007,8 +1202,8 @@ const ApplicationRow: React.FC<ApplicationRowProps> = ({ id, date, type, status,
             <option value="সম্পন্ন">সম্পন্ন</option>
           </select>
         ) : (
-          <span className={`px-2 py-0.5 text-[9px] font-bold text-white rounded-full ${statusColors[status] || 'bg-gray-400'}`}>
-            {statusLabels[status] || status}
+          <span className={`px-2 py-0.5 text-[9px] font-bold text-white rounded-full ${config.color}`}>
+            {config.label}
           </span>
         )}
       </td>
@@ -1310,15 +1505,69 @@ function UserManagement() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm('আপনি কি নিশ্চিত যে আপনি এই ইউজারটি মুছতে চান?')) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+  const handleDelete = async () => {
+    if (confirmDeleteId) {
       try {
-        await fetch(`/api/users/${id}`, { method: 'DELETE' });
+        await fetch(`/api/users/${confirmDeleteId}`, { method: 'DELETE' });
         fetchUsers();
       } catch (error) {
         console.error('Error deleting user:', error);
+      } finally {
+        setConfirmDeleteId(null);
       }
     }
+  };
+
+  const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        
+        const requiredHeaders = ['name', 'email', 'password', 'role', 'division', 'status'];
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+        
+        if (missingHeaders.length > 0) {
+          alert(`CSV ফাইলে নিম্নলিখিত কলামগুলো অনুপস্থিত: ${missingHeaders.join(', ')}`);
+          return;
+        }
+
+        const newUsers = [];
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          const values = lines[i].split(',').map(v => v.trim());
+          const user: any = {};
+          headers.forEach((header, index) => {
+            user[header] = values[index];
+          });
+          newUsers.push(user);
+        }
+
+        // Send to backend
+        for (const user of newUsers) {
+          await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(user)
+          });
+        }
+        
+        fetchUsers();
+        alert('সফলভাবে ইউজার ইমপোর্ট করা হয়েছে!');
+      } catch (error) {
+        console.error('Error importing CSV:', error);
+        alert('CSV ইমপোর্ট করার সময় একটি ত্রুটি হয়েছে।');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input
   };
 
   if (loading) return <div className="text-center py-10 text-gray-500 text-xs">লোড হচ্ছে...</div>;
@@ -1327,13 +1576,28 @@ function UserManagement() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-sm font-bold text-gray-700">ইউজার তালিকা</h3>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="bg-[#1a3a6b] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-blue-800 transition flex items-center gap-2"
-        >
-          <PlusCircle className="w-3.5 h-3.5" />
-          নতুন ইউজার যোগ করুন
-        </button>
+        <div className="flex gap-2">
+          <a 
+            href="data:text/csv;charset=utf-8,name,email,password,role,division,status%0AJohn Doe,john@example.com,password123,employee,Administration,Active" 
+            download="users_template.csv"
+            className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-gray-200 transition flex items-center gap-2 border border-gray-200"
+          >
+            <Download className="w-3.5 h-3.5" />
+            টেমপ্লেট ডাউনলোড
+          </a>
+          <label className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-green-700 transition flex items-center gap-2 cursor-pointer">
+            <Upload className="w-3.5 h-3.5" />
+            CSV ইমপোর্ট
+            <input type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
+          </label>
+          <button 
+            onClick={() => handleOpenModal()}
+            className="bg-[#1a3a6b] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold hover:bg-blue-800 transition flex items-center gap-2"
+          >
+            <PlusCircle className="w-3.5 h-3.5" />
+            নতুন ইউজার যোগ করুন
+          </button>
+        </div>
       </div>
       
       <div className="overflow-x-auto">
@@ -1370,7 +1634,7 @@ function UserManagement() {
                     <Edit className="w-4 h-4" />
                   </button>
                   <button 
-                    onClick={() => handleDelete(u.id)}
+                    onClick={() => setConfirmDeleteId(u.id)}
                     className="text-red-600 hover:text-red-800 p-1 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1381,6 +1645,13 @@ function UserManagement() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDeleteId} 
+        message="আপনি কি নিশ্চিত যে আপনি এই ইউজারটি মুছতে চান?" 
+        onConfirm={handleDelete} 
+        onCancel={() => setConfirmDeleteId(null)} 
+      />
 
       {/* Modal */}
       {isModalOpen && (
@@ -1490,10 +1761,10 @@ function UserManagement() {
   );
 }
 
-
-function AllApplications() {
+function AllApplications({ user }: { user: UserData }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
 
   useEffect(() => {
     fetch('/api/applications')
@@ -1543,24 +1814,27 @@ function AllApplications() {
                 <td className="px-4 py-4 text-xs text-gray-500">{app.division}</td>
                 <td className="px-4 py-4 text-xs text-gray-600 truncate max-w-[150px]">{app.service_type}</td>
                 <td className="px-4 py-4">
-                  <span className={`px-2 py-0.5 text-[9px] font-bold text-white rounded-full ${
-                    app.status === 'Submitted' ? 'bg-gray-400' : 
-                    app.status === 'Forwarded for Approval' ? 'bg-indigo-500' :
-                    app.status === 'In Progress' ? 'bg-yellow-500' : 'bg-green-500'
-                  }`}>
-                    {app.status === 'Submitted' ? 'দাখিলকৃত' : 
-                     app.status === 'Forwarded for Approval' ? 'অনুমোদনের জন্য প্রেরিত' :
-                     app.status === 'In Progress' ? 'চলমান' : 'সম্পন্ন'}
+                  <span className={`px-2 py-0.5 text-[9px] font-bold text-white rounded-full ${STATUS_CONFIG[app.status]?.color || 'bg-gray-400'}`}>
+                    {STATUS_CONFIG[app.status]?.label || app.status}
                   </span>
                 </td>
                 <td className="px-4 py-4 text-right">
-                  <button className="text-[#1a3a6b] hover:text-blue-900 text-xs font-bold">ম্যানেজ</button>
+                  <button 
+                    onClick={() => setSelectedApp(app)}
+                    className="text-[#1a3a6b] hover:text-blue-900 text-xs font-bold"
+                  >
+                    ম্যানেজ
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {selectedApp && (
+        <ApplicationViewModal app={selectedApp} onClose={() => setSelectedApp(null)} />
+      )}
     </div>
   );
 }
@@ -1709,13 +1983,17 @@ function DivisionManagement() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm('আপনি কি নিশ্চিত যে আপনি এই বিভাগটি মুছতে চান?')) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+  const handleDelete = async () => {
+    if (confirmDeleteId) {
       try {
-        await fetch(`/api/divisions/${id}`, { method: 'DELETE' });
+        await fetch(`/api/divisions/${confirmDeleteId}`, { method: 'DELETE' });
         fetchDivisions();
       } catch (error) {
         console.error('Error deleting division:', error);
+      } finally {
+        setConfirmDeleteId(null);
       }
     }
   };
@@ -1765,7 +2043,7 @@ function DivisionManagement() {
                     <Edit className="w-4 h-4" />
                   </button>
                   <button 
-                    onClick={() => handleDelete(d.id)}
+                    onClick={() => setConfirmDeleteId(d.id)}
                     className="text-red-600 hover:text-red-800 p-1 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1776,6 +2054,13 @@ function DivisionManagement() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDeleteId} 
+        message="আপনি কি নিশ্চিত যে আপনি এই বিভাগটি মুছতে চান?" 
+        onConfirm={handleDelete} 
+        onCancel={() => setConfirmDeleteId(null)} 
+      />
 
       {/* Modal */}
       {isModalOpen && (
@@ -1956,13 +2241,17 @@ function RoleManagement() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm('আপনি কি নিশ্চিত যে আপনি এই রোলটি মুছতে চান?')) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+  const handleDelete = async () => {
+    if (confirmDeleteId) {
       try {
-        await fetch(`/api/roles/${id}`, { method: 'DELETE' });
+        await fetch(`/api/roles/${confirmDeleteId}`, { method: 'DELETE' });
         fetchRoles();
       } catch (error) {
         console.error('Error deleting role:', error);
+      } finally {
+        setConfirmDeleteId(null);
       }
     }
   };
@@ -2014,7 +2303,7 @@ function RoleManagement() {
                     <Edit className="w-4 h-4" />
                   </button>
                   <button 
-                    onClick={() => handleDelete(r.id)}
+                    onClick={() => setConfirmDeleteId(r.id)}
                     className="text-red-600 hover:text-red-800 p-1 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -2025,6 +2314,13 @@ function RoleManagement() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDeleteId} 
+        message="আপনি কি নিশ্চিত যে আপনি এই রোলটি মুছতে চান?" 
+        onConfirm={handleDelete} 
+        onCancel={() => setConfirmDeleteId(null)} 
+      />
 
       {/* Modal */}
       {isModalOpen && (
@@ -2141,7 +2437,3 @@ function RoleManagement() {
     </div>
   );
 }
-
-
-
-

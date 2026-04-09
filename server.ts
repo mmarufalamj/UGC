@@ -121,6 +121,17 @@ try {
     db.exec("ALTER TABLE applications ADD COLUMN div_head_signed_at TEXT");
     db.exec("ALTER TABLE applications ADD COLUMN div_head_email TEXT");
   }
+  if (!appColumns.some(c => c.name === 'designation')) {
+    db.exec("ALTER TABLE applications ADD COLUMN designation TEXT");
+  }
+  if (!appColumns.some(c => c.name === 'mobile')) {
+    db.exec("ALTER TABLE applications ADD COLUMN mobile TEXT");
+  }
+  if (!appColumns.some(c => c.name === 'officer_signature')) {
+    db.exec("ALTER TABLE applications ADD COLUMN officer_signature TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN officer_signed_at TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN officer_name TEXT");
+  }
 } catch (e) {
   console.error("Application migration error:", e);
 }
@@ -323,7 +334,7 @@ async function startServer() {
   });
 
   app.post("/api/applications", (req, res) => {
-    const { user_email, user_name, division, service_type, problem_details, applicant_signature, applicant_signed_at } = req.body;
+    const { user_email, user_name, division, service_type, problem_details, applicant_signature, applicant_signed_at, designation, mobile } = req.body;
     const year = new Date().getFullYear();
     
     // Generate tracking number: ITSF-YYYY-XXXX
@@ -342,33 +353,37 @@ async function startServer() {
     const info = db.prepare(`
       INSERT INTO applications (
         tracking_no, user_email, user_name, division, service_type, problem_details, 
-        status, submission_date, applicant_signature, applicant_signed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        status, submission_date, applicant_signature, applicant_signed_at, designation, mobile
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       tracking_no, user_email, user_name, division, service_type, problem_details, 
-      'Submitted', submission_date, applicant_signature, applicant_signed_at
+      'Submitted', submission_date, applicant_signature, applicant_signed_at, designation, mobile
     );
     
     res.json({ id: info.lastInsertRowid, tracking_no, status: 'Submitted', submission_date });
   });
 
   app.put("/api/applications/approve", (req, res) => {
-    const { id, div_head_email, div_head_signature, div_head_signed_at } = req.body;
+    const { id, div_head_email, div_head_signature, div_head_signed_at, status } = req.body;
     db.prepare(`
       UPDATE applications 
-      SET status = 'Forwarded for Approval', 
+      SET status = ?, 
           div_head_email = ?, 
           div_head_signature = ?, 
           div_head_signed_at = ? 
       WHERE id = ?
-    `).run(div_head_email, div_head_signature, div_head_signed_at, id);
+    `).run(status || 'Forwarded for Approval', div_head_email, div_head_signature, div_head_signed_at, id);
     res.json({ success: true });
   });
 
   app.put("/api/applications/:id/status", (req, res) => {
     const { id } = req.params;
-    const { status } = req.body;
-    db.prepare("UPDATE applications SET status = ? WHERE id = ?").run(status, id);
+    const { status, officer_signature, officer_signed_at, officer_name } = req.body;
+    if (officer_signature) {
+      db.prepare("UPDATE applications SET status = ?, officer_signature = ?, officer_signed_at = ?, officer_name = ? WHERE id = ?").run(status, officer_signature, officer_signed_at, officer_name, id);
+    } else {
+      db.prepare("UPDATE applications SET status = ? WHERE id = ?").run(status, id);
+    }
     res.json({ success: true });
   });
 
