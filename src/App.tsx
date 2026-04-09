@@ -17,6 +17,7 @@ const AVAILABLE_FEATURES = [
   { id: 'dashboard', name: 'ড্যাশবোর্ড' },
   { id: 'application_form', name: 'আবেদন ফরম' },
   { id: 'application_history', name: 'আবেদনের ইতিহাস' },
+  { id: 'received_applications', name: 'আগত আবেদনসমূহ' },
   { id: 'assigned_applications', name: 'অ্যাসাইনকৃত আবেদন' },
   { id: 'user_management', name: 'ইউজার ম্যানেজমেন্ট' },
   { id: 'role_management', name: 'রোল ম্যানেজমেন্ট' },
@@ -38,8 +39,19 @@ interface UserData {
 }
 
 export default function App() {
-  const [user, setUser] = useState<UserData | null>(null);
-  const [currentView, setCurrentView] = useState<'dashboard' | 'application_form' | 'user_management' | 'division_management' | 'role_management' | 'my_applications' | 'all_applications' | 'system_settings' | 'profile'>('dashboard');
+  const [user, setUser] = useState<UserData | null>(() => {
+    const savedUser = localStorage.getItem('ugc_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('ugc_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('ugc_user');
+    }
+  }, [user]);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'application_form' | 'user_management' | 'division_management' | 'role_management' | 'my_applications' | 'all_applications' | 'system_settings' | 'profile' | 'received_applications' | 'assigned_applications'>('dashboard');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -204,6 +216,12 @@ export default function App() {
                   onClick={() => setCurrentView(user.role === 'admin' ? 'all_applications' : 'my_applications')} 
                 />
               )}
+              {user.permissions?.includes('received_applications') && (
+                <SidebarLink icon={<FileText />} label="আগত আবেদনসমূহ" active={currentView === 'received_applications'} onClick={() => setCurrentView('received_applications')} />
+              )}
+              {user.permissions?.includes('assigned_applications') && (
+                <SidebarLink icon={<ShieldCheck />} label="অ্যাসাইনকৃত আবেদন" active={currentView === 'assigned_applications'} onClick={() => setCurrentView('assigned_applications')} />
+              )}
               {user.permissions?.includes('user_management') && (
                 <SidebarLink icon={<Users />} label="ইউজার ম্যানেজমেন্ট" active={currentView === 'user_management'} onClick={() => setCurrentView('user_management')} />
               )}
@@ -230,6 +248,8 @@ export default function App() {
                   {currentView === 'application_form' ? 'আইটি সেবা ফরম' : 
                    currentView === 'my_applications' ? 'আমার আবেদনসমূহ' :
                    currentView === 'all_applications' ? 'সকল আবেদন' :
+                   currentView === 'received_applications' ? 'আগত আবেদনসমূহ' :
+                   currentView === 'assigned_applications' ? 'অ্যাসাইনকৃত আবেদন' :
                    currentView === 'profile' ? 'প্রোফাইল' :
                    (user.role === 'admin' ? 'সিস্টেম ওভারভিউ' : 'আমার ড্যাশবোর্ড')}
                 </h2>
@@ -248,6 +268,8 @@ export default function App() {
                  currentView === 'role_management' ? <RoleManagement /> :
                  currentView === 'my_applications' ? <ApplicationList user={user} /> :
                  currentView === 'all_applications' ? <AllApplications /> :
+                 currentView === 'received_applications' ? <ReceivedApplications user={user} /> :
+                 currentView === 'assigned_applications' ? <ApplicationList user={user} /> :
                  currentView === 'system_settings' ? <SystemSettings /> :
                  currentView === 'profile' ? <Profile user={user} onUpdate={setUser} /> :
                  (user.role === 'admin' ? <AdminDashboard /> : <ApplicationList user={user} />)}
@@ -279,6 +301,7 @@ function SidebarLink({ icon, label, active = false, onClick }: { icon: React.Rea
 function ApplicationForm({ user }: { user: UserData }) {
   const [submitted, setSubmitted] = useState(false);
   const [trackingNo, setTrackingNo] = useState('');
+  const [formOpenTime] = useState(new Date().toLocaleString('bn-BD'));
   const [formData, setFormData] = useState({
     applicant_name: user.name_bn,
     designation: '',
@@ -308,7 +331,9 @@ function ApplicationForm({ user }: { user: UserData }) {
           user_name: user.name_bn,
           division: formData.division,
           service_type: formData.service_type.join(', '),
-          problem_details: formData.problem_details
+          problem_details: formData.problem_details,
+          applicant_signature: user.signature,
+          applicant_signed_at: formOpenTime
         })
       });
       const data = await response.json();
@@ -471,7 +496,13 @@ function ApplicationForm({ user }: { user: UserData }) {
             </div>
 
             <div className="sig-row">
-              <div className="sig-line">আবেদনকারীর স্বাক্ষর ও তারিখ</div>
+              <div className="sig-line relative">
+                {user.signature && (
+                  <img src={user.signature} alt="Signature" className="absolute bottom-full left-1/2 -translate-x-1/2 h-6 mb-2" />
+                )}
+                <div className="text-[10px] text-gray-500 mb-1">{formOpenTime}</div>
+                আবেদনকারীর স্বাক্ষর ও তারিখ
+              </div>
               <div className="sig-line">সংশ্লিষ্ট বিভাগীয় প্রধানের স্বাক্ষর ও তারিখ</div>
             </div>
           </div>
@@ -636,6 +667,200 @@ interface Application {
   problem_details: string;
   status: string;
   submission_date: string;
+  applicant_signature?: string;
+  applicant_signed_at?: string;
+  div_head_signature?: string;
+  div_head_signed_at?: string;
+  div_head_email?: string;
+}
+
+function ReceivedApplications({ user }: { user: UserData }) {
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+
+  const fetchApps = async () => {
+    try {
+      const response = await fetch('/api/applications');
+      const data = await response.json();
+      const filtered = data.filter((app: Application) => app.division === user.division && app.status === 'Submitted');
+      setApplications(filtered);
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApps();
+  }, [user.division]);
+
+  const handleApprove = async (appId: number) => {
+    try {
+      await fetch('/api/applications/approve', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: appId,
+          div_head_email: user.email,
+          div_head_signature: user.signature,
+          div_head_signed_at: new Date().toLocaleString('bn-BD')
+        })
+      });
+      fetchApps();
+    } catch (error) {
+      console.error('Error approving application:', error);
+    }
+  };
+
+  if (loading) return <div className="text-center py-10 text-gray-500 text-xs">লোড হচ্ছে...</div>;
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-100">
+        <thead>
+          <tr className="bg-gray-50/50">
+            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">ট্র্যাকিং নম্বর</th>
+            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">আবেদনকারী</th>
+            <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">সেবার ধরণ</th>
+            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">অ্যাকশন</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {applications.map((app) => (
+            <tr key={app.id} className="hover:bg-gray-50/50 transition-colors">
+              <td className="px-4 py-4 text-xs font-bold text-blue-600">{app.tracking_no}</td>
+              <td className="px-4 py-4 text-xs text-gray-600">{app.user_name}</td>
+              <td className="px-4 py-4 text-xs text-gray-500">{app.service_type}</td>
+              <td className="px-4 py-4 text-right space-x-2">
+                <button 
+                  onClick={() => setSelectedApp(app)}
+                  className="text-[#1a3a6b] hover:text-blue-900 text-xs font-bold"
+                >
+                  দেখুন
+                </button>
+                <button 
+                  onClick={() => handleApprove(app.id)}
+                  className="bg-green-600 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-green-700"
+                >
+                  অনুমোদন করুন
+                </button>
+              </td>
+            </tr>
+          ))}
+          {applications.length === 0 && (
+            <tr>
+              <td colSpan={4} className="px-4 py-10 text-center text-gray-400 text-xs italic">কোন নতুন আবেদন নেই</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {selectedApp && (
+        <ApplicationViewModal app={selectedApp} onClose={() => setSelectedApp(null)} />
+      )}
+    </div>
+  );
+}
+
+function ApplicationViewModal({ app, onClose }: { app: Application, onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="bg-[#1a3a6b] px-6 py-4 flex justify-between items-center shrink-0">
+          <h3 className="text-white font-bold text-sm">আবেদনের বিস্তারিত</h3>
+          <div className="flex items-center gap-4">
+            <button onClick={() => window.print()} className="text-white hover:text-gray-200 flex items-center gap-2 text-xs font-bold">
+              <Printer className="w-4 h-4" /> প্রিন্ট
+            </button>
+            <button onClick={onClose} className="text-white hover:text-gray-200">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        <div className="p-8 overflow-auto flex-1 bg-gray-50">
+          <div className="bg-white p-10 shadow-sm border border-gray-200 mx-auto w-[800px] min-h-[1000px] relative font-[Inter]">
+            {/* Header */}
+            <div className="flex justify-between border-bottom-2 border-black pb-4 mb-6">
+              <img src="/UGC_Logo_1.png" alt="Logo" className="h-20" />
+              <div className="text-center flex-1">
+                <h1 className="text-2xl font-bold font-[Nikosh]">বাংলাদেশ বিশ্ববিদ্যালয় মঞ্জুরী কমিশন</h1>
+                <p className="text-sm font-bold">University Grants Commission of Bangladesh</p>
+                <p className="text-xs">আগারগাঁও, শেরে বাংলা নগর, ঢাকা-১২০৭</p>
+                <p className="text-xs font-bold">website: www.ugc.gov.bd</p>
+              </div>
+              <div className="text-right text-xs text-purple-800 font-bold">
+                আইটিএসএফ: ২০২৬/{app.tracking_no.split('-')[2]}
+              </div>
+            </div>
+
+            <h2 className="text-center text-lg font-bold underline mb-8">আইটি সেবা ফরম</h2>
+
+            <div className="border border-black p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-y-4 text-sm">
+                <div className="flex gap-2"><b>আবেদনকারীর নাম:</b> <span className="border-b border-black flex-1">{app.user_name}</span></div>
+                <div className="flex gap-2"><b>পদবী:</b> <span className="border-b border-black flex-1"></span></div>
+                <div className="flex gap-2"><b>বিভাগ/দপ্তর:</b> <span className="border-b border-black flex-1">{app.division}</span></div>
+                <div className="flex gap-2"><b>মোবাইল:</b> <span className="border-b border-black flex-1"></span></div>
+              </div>
+
+              <div>
+                <p className="text-sm font-bold mb-2">সেবার ধরণ: {app.service_type}</p>
+              </div>
+
+              <div>
+                <p className="text-sm font-bold mb-1">সমস্যার বিবরণ :</p>
+                <div className="border border-black p-3 min-h-[100px] text-sm">
+                  {app.problem_details}
+                </div>
+              </div>
+
+              <div className="flex justify-between mt-12 pt-10">
+                <div className="text-center w-[45%] border-t border-black pt-2 relative">
+                  {app.applicant_signature && (
+                    <img src={app.applicant_signature} alt="Signature" className="absolute bottom-full left-1/2 -translate-x-1/2 h-6 mb-2" />
+                  )}
+                  <p className="text-[10px] text-gray-500">{app.applicant_signed_at}</p>
+                  <p className="text-xs font-bold">আবেদনকারীর স্বাক্ষর ও তারিখ</p>
+                </div>
+                <div className="text-center w-[45%] border-t border-black pt-2 relative">
+                  {app.div_head_signature && (
+                    <img src={app.div_head_signature} alt="Signature" className="absolute bottom-full left-1/2 -translate-x-1/2 h-6 mb-2" />
+                  )}
+                  <p className="text-[10px] text-gray-500">{app.div_head_signed_at}</p>
+                  <p className="text-xs font-bold">সংশ্লিষ্ট বিভাগীয় প্রধানের স্বাক্ষর ও তারিখ</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <p className="text-sm font-bold mb-2">আইসিটি বিভাগ কর্তৃক পূরণীয়:</p>
+              <div className="border border-black p-6">
+                <div className="grid grid-cols-4 gap-4 mb-8">
+                  {['দায়িত্বপ্রাপ্ত কর্মকর্তার স্বাক্ষর', 'উপ-পরিচালক', 'অতিরিক্ত পরিচালক', 'পরিচালক'].map(role => (
+                    <div key={role} className="border-t border-black text-center text-[10px] font-bold pt-1">{role}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-xs mb-4">
+                  <div className="flex gap-2"><b>সেবা প্রদানকারীর নাম:</b> <span className="border-b border-black flex-1"></span></div>
+                  <div className="flex gap-2"><b>পদবী:</b> <span className="border-b border-black flex-1"></span></div>
+                </div>
+                <div className="text-xs">
+                  <b>সেবা প্রদান সংক্রান্ত তথ্য :</b>
+                  <div className="border border-black min-h-[60px] mt-1"></div>
+                </div>
+                <div className="flex justify-between mt-10">
+                  <div className="text-center w-[45%] border-t border-black pt-1 text-[10px] font-bold">সেবা প্রদানকারীর স্বাক্ষর ও তারিখ</div>
+                  <div className="text-center w-[45%] border-t border-black pt-1 text-[10px] font-bold">সেবা গ্রহণকারীর/পক্ষের স্বাক্ষর ও তারিখ</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ApplicationList({ user }: { user: UserData }) {
@@ -643,36 +868,50 @@ function ApplicationList({ user }: { user: UserData }) {
   const [loading, setLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
 
-  useEffect(() => {
-    const fetchApps = async () => {
-      try {
-        let url = '/api/applications';
-        if (user.role === 'employee') {
-          url += `?email=${user.email}`;
-        }
-        const response = await fetch(url);
-        let data = await response.json();
-        
-        // Filter for Desk Officers
-        if (user.role === 'desk_officer_hardware') {
-          data = data.filter((app: any) => app.service_type.includes('হার্ডওয়্যার'));
-        } else if (user.role === 'desk_officer_network') {
-          data = data.filter((app: any) => app.service_type.includes('নেটওয়ার্ক'));
-        } else if (user.role === 'desk_officer_software') {
-          data = data.filter((app: any) => app.service_type.includes('সফটওয়্যার'));
-        } else if (user.role === 'desk_officer_maintenance') {
-          data = data.filter((app: any) => app.service_type.includes('সিস্টেম মেইনটেন্যান্স'));
-        }
-        
-        setApplications(data);
-      } catch (error) {
-        console.error('Error fetching applications:', error);
-      } finally {
-        setLoading(false);
+  const fetchApps = async () => {
+    try {
+      let url = '/api/applications';
+      if (user.role === 'employee') {
+        url += `?email=${user.email}`;
       }
-    };
+      const response = await fetch(url);
+      let data = await response.json();
+      
+      // Filter for Desk Officers
+      if (user.role === 'desk_officer_hardware') {
+        data = data.filter((app: any) => app.service_type.includes('হার্ডওয়্যার') && app.status !== 'Submitted');
+      } else if (user.role === 'desk_officer_network') {
+        data = data.filter((app: any) => app.service_type.includes('নেটওয়ার্ক') && app.status !== 'Submitted');
+      } else if (user.role === 'desk_officer_software') {
+        data = data.filter((app: any) => app.service_type.includes('সফটওয়্যার') && app.status !== 'Submitted');
+      } else if (user.role === 'desk_officer_maintenance') {
+        data = data.filter((app: any) => app.service_type.includes('সিস্টেম মেইনটেন্যান্স') && app.status !== 'Submitted');
+      }
+      
+      setApplications(data);
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchApps();
   }, [user.email, user.role]);
+
+  const handleStatusUpdate = async (id: number, status: string) => {
+    try {
+      await fetch(`/api/applications/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      fetchApps();
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
+  };
 
   if (loading) return <div className="text-center py-10 text-gray-500 text-xs">লোড হচ্ছে...</div>;
 
@@ -696,7 +935,8 @@ function ApplicationList({ user }: { user: UserData }) {
               date={app.submission_date} 
               type={app.service_type} 
               status={app.status} 
-              onView={(id) => setSelectedApp(applications.find(a => a.tracking_no === id) || null)}
+              onView={() => setSelectedApp(app)}
+              onStatusUpdate={user.role?.startsWith('desk_officer_') ? (status) => handleStatusUpdate(app.id, status) : undefined}
             />
           ))}
           {applications.length === 0 && (
@@ -707,65 +947,8 @@ function ApplicationList({ user }: { user: UserData }) {
         </tbody>
       </table>
 
-      {/* View Modal */}
       {selectedApp && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="bg-[#1a3a6b] px-6 py-4 flex justify-between items-center">
-              <h3 className="text-white font-bold text-sm">আবেদনের বিস্তারিত</h3>
-              <button onClick={() => setSelectedApp(null)} className="text-white hover:text-gray-200">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <p className="text-gray-400 font-bold uppercase tracking-wider mb-1">ট্র্যাকিং নম্বর</p>
-                  <p className="font-bold text-blue-600">{selectedApp.tracking_no}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400 font-bold uppercase tracking-wider mb-1">তারিখ</p>
-                  <p className="font-bold">{selectedApp.submission_date}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400 font-bold uppercase tracking-wider mb-1">আবেদনকারী</p>
-                  <p className="font-bold">{selectedApp.user_name}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400 font-bold uppercase tracking-wider mb-1">বিভাগ</p>
-                  <p className="font-bold">{selectedApp.division}</p>
-                </div>
-              </div>
-              
-              <div>
-                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-2">অনুরোধকৃত সেবাসমূহ</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedApp.service_type.split(', ').map((t, i) => (
-                    <span key={i} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-xs border border-blue-100 font-medium">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">সমস্যার বিবরণ</p>
-                <div className="bg-gray-50 p-3 rounded-lg text-xs text-gray-700 leading-relaxed border border-gray-100">
-                  {selectedApp.problem_details || 'কোন বিবরণ নেই'}
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <button 
-                  onClick={() => setSelectedApp(null)}
-                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-200 transition"
-                >
-                  বন্ধ করুন
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ApplicationViewModal app={selectedApp} onClose={() => setSelectedApp(null)} />
       )}
     </div>
   );
@@ -776,15 +959,19 @@ interface ApplicationRowProps {
   date: string;
   type: string;
   status: string;
-  onView: (id: string) => void;
+  onView: () => void;
+  onStatusUpdate?: (status: string) => void;
 }
 
-const ApplicationRow: React.FC<ApplicationRowProps> = ({ id, date, type, status, onView }) => {
+const ApplicationRow: React.FC<ApplicationRowProps> = ({ id, date, type, status, onView, onStatusUpdate }) => {
   const statusColors: Record<string, string> = {
     'Submitted': 'bg-gray-400',
     'Forwarded for Approval': 'bg-indigo-500',
     'In Progress': 'bg-yellow-500',
-    'Done': 'bg-green-500'
+    'Done': 'bg-green-500',
+    'প্রক্রিয়াধীন রয়েছে': 'bg-yellow-500',
+    'নথিতে উপস্থাপন করা হয়েছে': 'bg-blue-500',
+    'সম্পন্ন': 'bg-green-500'
   };
 
   const statusLabels: Record<string, string> = {
@@ -808,13 +995,26 @@ const ApplicationRow: React.FC<ApplicationRowProps> = ({ id, date, type, status,
         </div>
       </td>
       <td className="px-4 py-4">
-        <span className={`px-2 py-0.5 text-[9px] font-bold text-white rounded-full ${statusColors[status] || 'bg-gray-400'}`}>
-          {statusLabels[status] || status}
-        </span>
+        {onStatusUpdate ? (
+          <select 
+            value={status} 
+            onChange={(e) => onStatusUpdate(e.target.value)}
+            className="text-[10px] font-bold border rounded px-1 py-0.5 bg-white"
+          >
+            <option value="Forwarded for Approval">অনুমোদনের জন্য প্রেরিত</option>
+            <option value="প্রক্রিয়াধীন রয়েছে">প্রক্রিয়াধীন রয়েছে</option>
+            <option value="নথিতে উপস্থাপন করা হয়েছে">নথিতে উপস্থাপন করা হয়েছে</option>
+            <option value="সম্পন্ন">সম্পন্ন</option>
+          </select>
+        ) : (
+          <span className={`px-2 py-0.5 text-[9px] font-bold text-white rounded-full ${statusColors[status] || 'bg-gray-400'}`}>
+            {statusLabels[status] || status}
+          </span>
+        )}
       </td>
       <td className="px-4 py-4 text-right">
         <button 
-          onClick={() => onView(id)}
+          onClick={onView}
           className="text-[#1a3a6b] hover:text-blue-900 text-xs font-bold flex items-center gap-1 ml-auto"
         >
           <FileText className="w-3 h-3" /> দেখুন

@@ -97,15 +97,32 @@ db.exec(`
     service_type TEXT NOT NULL,
     problem_details TEXT,
     status TEXT DEFAULT 'Submitted',
-    submission_date TEXT NOT NULL
+    submission_date TEXT NOT NULL,
+    applicant_signature TEXT,
+    applicant_signed_at TEXT,
+    div_head_signature TEXT,
+    div_head_signed_at TEXT,
+    div_head_email TEXT
   );
 `);
 
 // Ensure division column exists for existing databases
 try {
   db.exec("ALTER TABLE users ADD COLUMN division TEXT");
+} catch (e) {}
+
+// Migration: Add signature columns to applications
+try {
+  const appColumns = db.prepare("PRAGMA table_info(applications)").all() as any[];
+  if (!appColumns.some(c => c.name === 'applicant_signature')) {
+    db.exec("ALTER TABLE applications ADD COLUMN applicant_signature TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN applicant_signed_at TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN div_head_signature TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN div_head_signed_at TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN div_head_email TEXT");
+  }
 } catch (e) {
-  // Column likely already exists
+  console.error("Application migration error:", e);
 }
 
 // Seed initial data if empty
@@ -119,6 +136,7 @@ if (userCount.count === 0) {
   insertUser.run("Maintenance Desk Officer", "maintenance@ugc.gov.bd", "password", "ডেস্ক অফিসার (মেইনটেন্যান্স)", "desk_officer_maintenance", "আইসিটি বিভাগ", "Active");
   insertUser.run("Test Employee", "employee@ugc.gov.bd", "password", "টেস্ট কর্মচারী", "employee", "প্রশাসন বিভাগ", "Active");
   insertUser.run("Maruf Alam", "maruf@ugc.gov.bd", "password", "মারুফ আলম", "employee", "অর্থ ও হিসাব বিভাগ", "Inactive");
+  insertUser.run("Maruf Alam (Admin)", "mmarufalamj@gmail.com", "password", "মারুফ আলম", "admin", "আইসিটি বিভাগ", "Active");
 }
 
 const divisionCount = db.prepare("SELECT count(*) as count FROM divisions").get() as { count: number };
@@ -143,6 +161,9 @@ if (roleCount.count === 0) {
   insertRole.run("Desk Officer (Software)", "desk_officer_software", "ডেস্ক অফিসার (সফটওয়্যার)", "সফটওয়্যার সংক্রান্ত সেবা সমাধান", officerPerms, "Active");
   insertRole.run("Desk Officer (Maintenance)", "desk_officer_maintenance", "ডেস্ক অফিসার (মেইনটেন্যান্স)", "সিস্টেম মেইনটেন্যান্স সেবা সমাধান", officerPerms, "Active");
   insertRole.run("Employee", "employee", "কর্মচারী", "সেবা অনুরোধ দাখিল", employeePerms, "Active");
+  
+  const divHeadPerms = JSON.stringify(['dashboard', 'received_applications', 'application_history', 'profile']);
+  insertRole.run("Divisional Head", "divisional_head", "বিভাগীয় প্রধান", "বিভাগীয় আবেদন অনুমোদন", divHeadPerms, "Active");
 }
 
 const appCount = db.prepare("SELECT count(*) as count FROM applications").get() as { count: number };
@@ -302,7 +323,7 @@ async function startServer() {
   });
 
   app.post("/api/applications", (req, res) => {
-    const { user_email, user_name, division, service_type, problem_details } = req.body;
+    const { user_email, user_name, division, service_type, problem_details, applicant_signature, applicant_signed_at } = req.body;
     const year = new Date().getFullYear();
     
     // Generate tracking number: ITSF-YYYY-XXXX
@@ -318,10 +339,30 @@ async function startServer() {
     const tracking_no = `ITSF-${year}-${nextSerial.toString().padStart(4, '0')}`;
     const submission_date = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
     
-    const info = db.prepare("INSERT INTO applications (tracking_no, user_email, user_name, division, service_type, problem_details, status, submission_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(tracking_no, user_email, user_name, division, service_type, problem_details, 'Submitted', submission_date);
+    const info = db.prepare(`
+      INSERT INTO applications (
+        tracking_no, user_email, user_name, division, service_type, problem_details, 
+        status, submission_date, applicant_signature, applicant_signed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      tracking_no, user_email, user_name, division, service_type, problem_details, 
+      'Submitted', submission_date, applicant_signature, applicant_signed_at
+    );
     
     res.json({ id: info.lastInsertRowid, tracking_no, status: 'Submitted', submission_date });
+  });
+
+  app.put("/api/applications/approve", (req, res) => {
+    const { id, div_head_email, div_head_signature, div_head_signed_at } = req.body;
+    db.prepare(`
+      UPDATE applications 
+      SET status = 'Forwarded for Approval', 
+          div_head_email = ?, 
+          div_head_signature = ?, 
+          div_head_signed_at = ? 
+      WHERE id = ?
+    `).run(div_head_email, div_head_signature, div_head_signed_at, id);
+    res.json({ success: true });
   });
 
   app.put("/api/applications/:id/status", (req, res) => {

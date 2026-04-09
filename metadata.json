@@ -1,5 +1,5 @@
 {
   "name": "UGC IT Service Request System",
-  "description": "A digital IT service request system for the University Grants Commission of Bangladesh (UGC) ICT Division, replacing paper-based bilingual forms with a full-stack PHP/MySQL solution.",
+  "description": "A digital IT service request system for the University Grants Commission of Bangladesh (UGC) ICT Division. Built with React, TypeScript, Express, and SQLite.",
   "requestFramePermissions": []
 }
