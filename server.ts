@@ -343,8 +343,27 @@ async function startServer() {
         db.prepare("UPDATE users SET signature = ? WHERE email = ?").run(signature, email);
       }
       
-      const user = db.prepare("SELECT name, name_bn, email, role, division, photo, signature FROM users WHERE email = ?").get(email);
-      res.json({ success: true, user });
+      const user = db.prepare(`
+        SELECT u.name, u.name_bn, u.email, u.role, u.division, u.photo, u.signature, r.permissions 
+        FROM users u 
+        LEFT JOIN roles r ON u.role = r.slug 
+        WHERE u.email = ?
+      `).get(email) as any;
+
+      let permissions = [];
+      try {
+        permissions = user.permissions ? JSON.parse(user.permissions) : [];
+      } catch (e) {
+        console.error("Error parsing user permissions", e);
+      }
+
+      res.json({ 
+        success: true, 
+        user: {
+          ...user,
+          permissions
+        } 
+      });
     } catch (error) {
       console.error("Profile update error:", error);
       res.status(500).json({ success: false, message: "প্রোফাইল আপডেট করতে সমস্যা হয়েছে" });
