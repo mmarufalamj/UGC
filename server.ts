@@ -132,6 +132,20 @@ try {
     db.exec("ALTER TABLE applications ADD COLUMN officer_signed_at TEXT");
     db.exec("ALTER TABLE applications ADD COLUMN officer_name TEXT");
   }
+  if (!appColumns.some(c => c.name === 'hw_officer_sig')) {
+    db.exec("ALTER TABLE applications ADD COLUMN hw_officer_sig TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN hw_officer_date TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN hw_officer_name TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN nw_officer_sig TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN nw_officer_date TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN nw_officer_name TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN sw_officer_sig TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN sw_officer_date TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN sw_officer_name TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN mnt_officer_sig TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN mnt_officer_date TEXT");
+    db.exec("ALTER TABLE applications ADD COLUMN mnt_officer_name TEXT");
+  }
 } catch (e) {
   console.error("Application migration error:", e);
 }
@@ -378,9 +392,19 @@ async function startServer() {
 
   app.put("/api/applications/:id/status", (req, res) => {
     const { id } = req.params;
-    const { status, officer_signature, officer_signed_at, officer_name } = req.body;
+    const { status, officer_signature, officer_signed_at, officer_name, officer_role } = req.body;
     if (officer_signature) {
       db.prepare("UPDATE applications SET status = ?, officer_signature = ?, officer_signed_at = ?, officer_name = ? WHERE id = ?").run(status, officer_signature, officer_signed_at, officer_name, id);
+      
+      if (officer_role === 'desk_officer_hardware') {
+        db.prepare("UPDATE applications SET hw_officer_sig = ?, hw_officer_date = ?, hw_officer_name = ? WHERE id = ?").run(officer_signature, officer_signed_at, officer_name, id);
+      } else if (officer_role === 'desk_officer_network') {
+        db.prepare("UPDATE applications SET nw_officer_sig = ?, nw_officer_date = ?, nw_officer_name = ? WHERE id = ?").run(officer_signature, officer_signed_at, officer_name, id);
+      } else if (officer_role === 'desk_officer_software') {
+        db.prepare("UPDATE applications SET sw_officer_sig = ?, sw_officer_date = ?, sw_officer_name = ? WHERE id = ?").run(officer_signature, officer_signed_at, officer_name, id);
+      } else if (officer_role === 'desk_officer_maintenance') {
+        db.prepare("UPDATE applications SET mnt_officer_sig = ?, mnt_officer_date = ?, mnt_officer_name = ? WHERE id = ?").run(officer_signature, officer_signed_at, officer_name, id);
+      }
     } else {
       db.prepare("UPDATE applications SET status = ? WHERE id = ?").run(status, id);
     }

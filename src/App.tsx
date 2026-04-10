@@ -729,6 +729,18 @@ interface Application {
   officer_signature?: string;
   officer_signed_at?: string;
   officer_name?: string;
+  hw_officer_sig?: string;
+  hw_officer_date?: string;
+  hw_officer_name?: string;
+  nw_officer_sig?: string;
+  nw_officer_date?: string;
+  nw_officer_name?: string;
+  sw_officer_sig?: string;
+  sw_officer_date?: string;
+  sw_officer_name?: string;
+  mnt_officer_sig?: string;
+  mnt_officer_date?: string;
+  mnt_officer_name?: string;
 }
 
 function ReceivedApplications({ user }: { user: UserData }) {
@@ -1010,22 +1022,31 @@ function ApplicationViewModal({ app, onClose }: { app: Application, onClose: () 
               </div>
             </div>
 
-            <div className="mt-8">
-              <p className="text-sm font-bold mb-2">আইসিটি বিভাগ কর্তৃক পূরণীয়:</p>
+            <div className="mt-16 border-t-2 border-dashed border-gray-300 pt-8">
+              <p className="text-sm font-bold mb-4">আইসিটি বিভাগ কর্তৃক পূরণীয়:</p>
               <div className="border border-black p-6">
-                <div className="grid grid-cols-4 gap-4 mb-8">
-                  <div className="border-t border-black text-center text-[10px] font-bold pt-1 relative">
-                    {app.officer_signature && (
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 flex flex-col items-center">
-                        <img src={app.officer_signature} alt="Officer Signature" className="h-8 object-contain" />
-                        <span className="text-[8px] font-normal whitespace-nowrap">{app.officer_signed_at}</span>
+                <div className="grid grid-cols-4 gap-4 mb-12">
+                  {[
+                    { cat: 'হার্ডওয়্যার', label: 'Desk officer (Hardware)', sig: app.hw_officer_sig, date: app.hw_officer_date, name: app.hw_officer_name },
+                    { cat: 'নেটওয়ার্ক', label: 'Desk officer (Network)', sig: app.nw_officer_sig, date: app.nw_officer_date, name: app.nw_officer_name },
+                    { cat: 'সফটওয়্যার', label: 'Desk officer (Software)', sig: app.sw_officer_sig, date: app.sw_officer_date, name: app.sw_officer_name },
+                    { cat: 'সিস্টেম মেইনটেন্যান্স', label: 'Desk officer (Maintenance)', sig: app.mnt_officer_sig, date: app.mnt_officer_date, name: app.mnt_officer_name }
+                  ].map((item, idx) => {
+                    const isRelevant = app.service_type.includes(item.cat);
+                    if (!isRelevant) return <div key={idx}></div>;
+                    return (
+                      <div key={idx} className="border-t border-black text-center text-[9px] font-bold pt-1 relative min-h-[40px] flex flex-col justify-end">
+                        {item.sig && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 flex flex-col items-center w-full">
+                            <img src={item.sig} alt="Officer Signature" className="h-8 object-contain" />
+                            <span className="text-[7px] font-normal whitespace-nowrap">{item.date}</span>
+                            <span className="text-[7px] font-normal whitespace-nowrap">{item.name}</span>
+                          </div>
+                        )}
+                        {item.label}
                       </div>
-                    )}
-                    দায়িত্বপ্রাপ্ত কর্মকর্তার স্বাক্ষর
-                  </div>
-                  {['উপ-পরিচালক', 'অতিরিক্ত পরিচালক', 'পরিচালক'].map(role => (
-                    <div key={role} className="border-t border-black text-center text-[10px] font-bold pt-1">{role}</div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-xs mb-4">
                   <div className="flex gap-2"><b>সেবা প্রদানকারীর নাম:</b> <span className="border-b border-black flex-1">{app.officer_name}</span></div>
@@ -1113,7 +1134,8 @@ function ApplicationList({ user, view }: { user: UserData, view: 'my_application
           status,
           officer_signature: user.signature,
           officer_signed_at: new Date().toLocaleString('bn-BD'),
-          officer_name: user.name_bn
+          officer_name: user.name_bn,
+          officer_role: user.role
         })
       });
       fetchApps();
